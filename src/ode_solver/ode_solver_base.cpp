@@ -66,17 +66,21 @@ void ODESolverBase<dim,real,MeshType>::write_ode_solver_steady_state_convergence
         const double current_residual,
         const std::shared_ptr <dealii::TableHandler> data_table) const
 {
+    int current_polynomial_degree = this->dg->get_min_fe_degree();
     if(mpi_rank==0) {
         // Add iteration to the table
         std::string iteration_string = "Iteration";
         data_table->add_value(iteration_string, current_iteration);
+        data_table->set_precision(iteration_string, 16);
+        data_table->set_scientific(iteration_string, true);
         // Add residual to the table
         std::string residual_string = "Residual";
         data_table->add_value(residual_string, current_residual);
         data_table->set_precision(residual_string, 16);
         data_table->set_scientific(residual_string, true);    
         // Write to file
-        std::ofstream data_table_file("ode_solver_steady_state_convergence_data_table.txt");
+	std::string error_filename = "ode_solver_steady_state_convergence_data_table";
+        std::ofstream data_table_file(error_filename + std::string("_p") + std::to_string(current_polynomial_degree) + std::string(".txt"));
         data_table->write_text(data_table_file);
     }
 }
@@ -164,8 +168,9 @@ int ODESolverBase<dim,real,MeshType>::steady_state (const bool output_solution_f
         if (this->residual_norm_decrease < 1.0) {
             ramped_CFL *= pow((1.0-std::log10(this->residual_norm_decrease)*ode_param.time_step_factor_residual), ode_param.time_step_factor_residual_exp);
         }
-        ramped_CFL = std::max(ramped_CFL,initial_CFL*CFL_factor);
-        pcout << "Initial CFL = " << initial_CFL << ". Current CFL = " << ramped_CFL << std::endl;
+        // ramped_CFL = initial_CFL*CFL_factor;
+        // ramped_CFL = std::max(ramped_CFL,initial_CFL*CFL_factor);
+        pcout << "Initial CFL = " << initial_CFL << ". CFL Factor = " << CFL_factor << ". Current CFL = " << ramped_CFL << std::endl;
 
         if (this->residual_norm < 1e-12) {
             this->dg->freeze_artificial_dissipation = true;
@@ -200,6 +205,24 @@ int ODESolverBase<dim,real,MeshType>::steady_state (const bool output_solution_f
 
         convergence_error = this->residual_norm > ode_param.nonlinear_steady_residual_tolerance
                             && this->residual_norm_decrease > ode_param.nonlinear_steady_residual_tolerance;
+
+        pcout << " ********************************************************** "
+              << std::endl
+              << " Convergence Error: " << convergence_error
+              << std::endl
+              << " Residual Norm Decrease: " << residual_norm_decrease 
+              << " Nonlinear Steady Residual Tolerance: " << ode_param.nonlinear_steady_residual_tolerance
+              << std::endl
+              << " Nonlinear iteration: " << this->current_iteration
+              << " Nonlinear Max iteration: " << ode_param.nonlinear_max_iterations
+              << std::endl
+              << " residual norm: " << this->residual_norm
+              << std::endl
+              << " CFL_Factor: " << CFL_factor
+              << std::endl
+              << " ********************************************************** "
+              << std::endl;
+
     }
 
     if (this->residual_norm > 1e5
@@ -227,8 +250,17 @@ int ODESolverBase<dim,real,MeshType>::steady_state (const bool output_solution_f
           << std::endl
           << " ODESolver steady_state stopped at"
           << std::endl
+	  << " Convergence Error: " << convergence_error
+          << std::endl
+	  << " Residual Norm Decrease: " << residual_norm_decrease 
+	  << " Nonlinear Steady Residual Tolerance: " << ode_param.nonlinear_steady_residual_tolerance
+          << std::endl
           << " Nonlinear iteration: " << this->current_iteration
+          << " Nonlinear Max iteration: " << ode_param.nonlinear_max_iterations
+          << std::endl
           << " residual norm: " << this->residual_norm
+          << std::endl
+	  << " CFL_Factor: " << CFL_factor
           << std::endl
           << " ********************************************************** "
           << std::endl;
